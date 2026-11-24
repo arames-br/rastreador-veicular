@@ -1,15 +1,15 @@
 # Rastreador veicular — cópia de trabalho
 
-Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acrescenta o app Android com login, sincronização da última posição, armazenamento local da posição mais recente sem internet, notificação persistente, painel web e regras propostas. O código está em um repositório público; o painel ainda não foi implantado e nenhum outro projeto Firebase foi alterado.
+Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acrescenta o app Android com login, sincronização da última posição, armazenamento local da posição mais recente sem internet, notificação persistente, painel web e regras do Firestore publicadas. O código está em um repositório público; o painel ainda não foi implantado e nenhum outro projeto Firebase foi alterado.
 
 ## Situação atual e escolhas
 
 - Projeto dedicado: `rastreador-arames-brasil`, conta proprietária confirmada `aramesbrasil40@gmail.com`.
 - O Cloud Firestore foi criado no plano Spark, região São Paulo (`southamerica-east1`). A região não pode ser trocada depois da criação.
 - O provedor Firebase Authentication de e-mail/senha foi ativado. O cadastro é restrito na interface ao e-mail autorizado; a verificação do e-mail é exigida pelo app, painel e regras.
-- **As regras seguras estão neste repositório (`firebase/firestore.rules`), mas ainda precisam ser publicadas no projeto.** A sessão do Console apresentou problemas no editor e não foi possível confirmar a publicação. A política ativa deve permanecer negando acesso até publicar as regras finais; não use modo de teste nem regras abertas.
-- Os apps Android e Web já foram registrados no Firebase. A configuração Web foi obtida e salva apenas na cópia local; o `google-services.json` do Android ainda precisa ser incluído no projeto. Nenhum segredo ou chave privada foi colocado no código.
-- Não foi possível compilar o APK nesta máquina: não há Java nem Gradle instalados. Não houve teste em aparelho.
+- As regras restritivas do Firestore (`firebase/firestore.rules`) foram publicadas no projeto; o Console confirmou sucesso nesta sessão. A regra limita leitura/gravação ao e-mail verificado `aramesbrasil40@gmail.com` e ao documento `vehicles/vehicle-1`, com listagem e exclusão negadas. Authentication por e-mail/senha está habilitado; nenhuma conta foi cadastrada.
+- Os apps Android e Web estão registrados no Firebase. A configuração Web foi obtida e salva somente na cópia local. O `google-services.json` do Android ainda não foi instalado: o botão de download do Console foi acionado, mas o arquivo não ficou disponível para esta cópia; a API oficial `projects.androidApps.getConfig` respondeu HTTP 401 por falta de credencial OAuth nessa ferramenta. Não foi fabricado nem adicionado um JSON substituto. Nenhum segredo ou chave privada foi colocado no código.
+- A compilação não foi confirmada: esta máquina não tem Java/JDK, Gradle, Android SDK nem `adb` instalados. Uma tentativa de baixar o JDK 17 portátil foi interrompida pela cota de tamanho do workspace; os arquivos temporários foram removidos. Não houve teste em aparelho.
 
 ## Fluxo de dados / segurança
 
@@ -24,8 +24,8 @@ Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acresce
 No Console do projeto `rastreador-arames-brasil`, usando a conta `aramesbrasil40@gmail.com`:
 
 1. Em Authentication, confirme que o provedor E-mail/senha está ativado e ative a confirmação de e-mail, se ainda não estiver.
-2. Em Firestore > Regras, substitua o conteúdo por `firebase/firestore.rules`, revise e publique. Não abra o banco para todos. Depois confira que a regra publicada contém o e-mail permitido e não contém `allow read, write: if true`.
-3. Em Configurações do projeto > Seus apps, use o app Android já registrado com pacote `br.com.rastreadorveicular`. Baixe o `google-services.json` do Android para `android/RastreadorVeicular/app/google-services.json`.
+2. As regras de `firebase/firestore.rules` foram publicadas e o Console confirmou sucesso nesta sessão. Confira no Console que a versão ativa continua restrita ao e-mail permitido e não contém `allow read, write: if true`; não abra o banco para todos.
+3. Em Configurações do projeto > Seus apps, use o app Android já registrado com pacote `br.com.rastreadorveicular` (ID `1:28890842793:android:09c8cbd2825b13b33c0bb8`). Baixe o `google-services.json` oficial para `android/RastreadorVeicular/app/google-services.json`. Ele não foi obtido nesta sessão; não use JSON de conta de serviço.
 4. No checkout do repositório, copie `web/firebase-config.example.js` para `web/firebase-config.js` e preencha com a configuração do app Web já registrado, mostrada pelo Console. Uma cópia local já foi preenchida, mas não está no repositório. Essa configuração é pública, mas específica deste projeto.
 5. Crie a conta no próprio app Android com o e-mail exato autorizado e uma senha forte que você guarda num gerenciador de senhas; abra o link de verificação enviado ao e-mail. Não coloque a senha no projeto, no APK, no painel ou no chat. Se a conta já existir, use Entrar.
 6. Faça o primeiro lançamento de posição com o app, confirme no Console que surgiu somente `vehicles/vehicle-1` e teste o painel autenticado. Não compartilhe o acesso do painel.
@@ -55,5 +55,7 @@ O projeto está no Spark, sem configurar faturamento. Firestore e Firebase Hosti
 
 - Inspeção do ZIP de origem e preservação dele na cópia: concluído.
 - Verificação manual dos arquivos de código/configuração: feita.
-- Verificação do JSON de configuração, sintaxe do app web e regras: pendente/limitada até incluir os IDs e publicar a regra.
-- Compilação Android, autorização Firebase ponta a ponta, queda/retorno de internet, localização real, tela apagada, movimento e teste no veículo: não realizados.
+- Regras restritivas do Firestore: publicadas no Console; sucesso confirmado nesta sessão.
+- `google-services.json` Android: não obtido; o endpoint oficial exigiu OAuth e o download pelo Console não disponibilizou o arquivo nesta cópia. Validação da integração Android pendente.
+- Validação estática deste checkout: XML do Manifest e integridade do ZIP original conferidos; compilação Android não realizada por ausência de JDK/Gradle/SDK e pelo JSON ausente.
+- Autorização Firebase ponta a ponta, queda/retorno de internet, localização real, tela apagada, movimento e teste no veículo: não realizados.
