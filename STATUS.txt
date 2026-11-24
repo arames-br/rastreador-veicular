@@ -1,9 +1,10 @@
-CÓPIA DE TRABALHO — NÃO PUBLICADA
+CÓDIGO NO REPOSITÓRIO PÚBLICO — PAINEL NÃO IMPLANTADO
 Projeto Firebase dedicado: rastreador-arames-brasil
 Firestore: criado em southamerica-east1 / São Paulo (Spark)
 Authentication email/senha: ativado
 Regras finais publicadas: NÃO CONFIRMADO; manter acesso fechado
-App Android/Web registrados no Firebase: NÃO CONCLUÍDO
-google-services.json / firebase-config.js: NÃO FORNECIDOS
-Build/teste físico: NÃO REALIZADO (Java/Gradle indisponíveis)
-Nada foi publicado na internet.
+Apps Android e Web: registrados no Firebase
+Configuração Web: obtida e salva somente na cópia local; não incluída neste repositório
+google-services.json Android: ainda precisa ser incluído no projeto
+APK / compilação / teste físico e ponta a ponta: NÃO REALIZADOS
+Deploy do painel: NÃO REALIZADO; requer autorização expressa.

@@ -1,6 +1,6 @@
 # Rastreador veicular — cópia de trabalho
 
-Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acrescenta o app Android com login, sincronização da última posição, armazenamento local da posição mais recente sem internet, notificação persistente, painel web e regras propostas. Nada foi publicado e nenhum outro projeto Firebase foi alterado.
+Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acrescenta o app Android com login, sincronização da última posição, armazenamento local da posição mais recente sem internet, notificação persistente, painel web e regras propostas. O código está em um repositório público; o painel ainda não foi implantado e nenhum outro projeto Firebase foi alterado.
 
 ## Situação atual e escolhas
 
@@ -8,7 +8,7 @@ Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acresce
 - O Cloud Firestore foi criado no plano Spark, região São Paulo (`southamerica-east1`). A região não pode ser trocada depois da criação.
 - O provedor Firebase Authentication de e-mail/senha foi ativado. O cadastro é restrito na interface ao e-mail autorizado; a verificação do e-mail é exigida pelo app, painel e regras.
 - **As regras seguras estão neste repositório (`firebase/firestore.rules`), mas ainda precisam ser publicadas no projeto.** A sessão do Console apresentou problemas no editor e não foi possível confirmar a publicação. A política ativa deve permanecer negando acesso até publicar as regras finais; não use modo de teste nem regras abertas.
-- O Console não foi concluído para registrar os apps Android/Web e não foi obtido `google-services.json`/configuração Web. Sem esses arquivos a compilação e o painel não conectam ao Firebase. Nenhum segredo ou chave privada foi colocado no código.
+- Os apps Android e Web já foram registrados no Firebase. A configuração Web foi obtida e salva apenas na cópia local; o `google-services.json` do Android ainda precisa ser incluído no projeto. Nenhum segredo ou chave privada foi colocado no código.
 - Não foi possível compilar o APK nesta máquina: não há Java nem Gradle instalados. Não houve teste em aparelho.
 
 ## Fluxo de dados / segurança
@@ -25,8 +25,8 @@ No Console do projeto `rastreador-arames-brasil`, usando a conta `aramesbrasil40
 
 1. Em Authentication, confirme que o provedor E-mail/senha está ativado e ative a confirmação de e-mail, se ainda não estiver.
 2. Em Firestore > Regras, substitua o conteúdo por `firebase/firestore.rules`, revise e publique. Não abra o banco para todos. Depois confira que a regra publicada contém o e-mail permitido e não contém `allow read, write: if true`.
-3. Em Configurações do projeto > Seus apps, registre Android com pacote `br.com.rastreadorveicular` e registre um app Web. Baixe o `google-services.json` do Android para `android/RastreadorVeicular/app/google-services.json`.
-4. Copie `web/firebase-config.example.js` para `web/firebase-config.js` e substitua todos os `COLE_...` pela configuração do app Web mostrada pelo Console. Essa configuração é pública, mas específica deste projeto.
+3. Em Configurações do projeto > Seus apps, use o app Android já registrado com pacote `br.com.rastreadorveicular`. Baixe o `google-services.json` do Android para `android/RastreadorVeicular/app/google-services.json`.
+4. No checkout do repositório, copie `web/firebase-config.example.js` para `web/firebase-config.js` e preencha com a configuração do app Web já registrado, mostrada pelo Console. Uma cópia local já foi preenchida, mas não está no repositório. Essa configuração é pública, mas específica deste projeto.
 5. Crie a conta no próprio app Android com o e-mail exato autorizado e uma senha forte que você guarda num gerenciador de senhas; abra o link de verificação enviado ao e-mail. Não coloque a senha no projeto, no APK, no painel ou no chat. Se a conta já existir, use Entrar.
 6. Faça o primeiro lançamento de posição com o app, confirme no Console que surgiu somente `vehicles/vehicle-1` e teste o painel autenticado. Não compartilhe o acesso do painel.
 
