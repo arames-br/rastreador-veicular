@@ -1,19 +1,20 @@
 STATUS — atualização Android 1.1.0
 
 Projeto Firebase dedicado: rastreador-arames-brasil; proprietário autorizado: aramesbrasil40@gmail.com.
-O app instalado mantém o mesmo package name, `br.com.rastreadorveicular`; versionCode 3, versionName 1.1.0.
+App Android package name: `br.com.rastreadorveicular`; versionCode 3, versionName 1.1.0.
 
 Android:
-- Ao identificar o SSID exato `ARAMES BRASIL` (com ou sem aspas retornadas pelo Android), remove as atualizações de localização e impede novas posições/cache e uploads enquanto conectado.
+- Ao identificar o SSID exato `ARAMES BRASIL` (normaliza retorno do Android com ou sem aspas), remove as atualizações de localização e impede novas posições/cache e uploads enquanto conectado.
 - Notificação persistente informa a pausa; ao desconectar, o serviço ativo retoma GPS. Outras redes Wi-Fi e dados móveis mantêm rastreamento normal.
+- Observa redes Wi-Fi mesmo quando o ponto de acesso não tem Internet, além de callbacks para redes com Internet, para detectar a pausa sem depender de mudança de rede celular.
 - Se o Android não disponibilizar o SSID, rastreamento permanece ativo por segurança e a notificação informa que o SSID não pôde ser identificado.
 - Adicionada permissão normal ACCESS_WIFI_STATE; nenhuma permissão de runtime de localização foi ampliada.
-- Manifest, app version, implementação Kotlin, README e workflow atualizados no GitHub público.
+- Implementação, Manifest, versionamento, workflow, README e STATUS atualizados no GitHub público.
 
 CI / APK:
-- GitHub Actions run #7: `lintDebug` e `assembleDebug` concluíram com sucesso.
-- Artefato `rastreador-veicular-debug-apk`: https://github.com/arames-br/rastreador-veicular/actions/runs/45505346237
-- Retenção até 2026-12-01 19:56 (America/Sao_Paulo); baixar o ZIP do artefato antes da expiração.
+- GitHub Actions run #8: `lintDebug` e `assembleDebug` concluíram com sucesso.
+- Artefato `rastreador-veicular-debug-apk`: https://github.com/arames-br/rastreador-veicular/actions/runs/45505830913
+- Retenção até 2026-12-01 19:59 (America/Sao_Paulo); baixar o ZIP do artefato antes da expiração.
 - O workflow injeta a configuração Android do Firebase do segredo protegido `FIREBASE_ANDROID_CONFIG`; nenhum JSON secreto foi versionado.
 
-Limites: não houve teste em aparelho, teste de SSID real, teste de posição real, autenticação ponta a ponta, mudanças em regras Firebase nem deploy do painel web. A máquina local não dispõe do ambiente Android para compilar; o build confirmado foi no GitHub Actions.
+Limites: não houve teste em aparelho, teste de SSID real, teste de posição real, autenticação ponta a ponta, mudanças em regras Firebase nem deploy do painel web. Build confirmado no GitHub Actions; esta máquina local não dispõe do ambiente Android para compilar.
