@@ -8,8 +8,8 @@ Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acresce
 - O Cloud Firestore foi criado no plano Spark, região São Paulo (`southamerica-east1`). A região não pode ser trocada depois da criação.
 - O provedor Firebase Authentication de e-mail/senha foi ativado. O cadastro é restrito na interface ao e-mail autorizado; a verificação do e-mail é exigida pelo app, painel e regras.
 - As regras restritivas do Firestore (`firebase/firestore.rules`) foram publicadas no projeto; o Console confirmou sucesso nesta sessão. A regra limita leitura/gravação ao e-mail verificado `aramesbrasil40@gmail.com` e ao documento `vehicles/vehicle-1`, com listagem e exclusão negadas. Authentication por e-mail/senha está habilitado; nenhuma conta foi cadastrada.
-- Os apps Android e Web estão registrados no Firebase. A configuração Web foi obtida e salva somente na cópia local. O `google-services.json` do Android ainda não foi instalado: o botão de download do Console foi acionado, mas o arquivo não ficou disponível para esta cópia; a API oficial `projects.androidApps.getConfig` respondeu HTTP 401 por falta de credencial OAuth nessa ferramenta. Não foi fabricado nem adicionado um JSON substituto. Nenhum segredo ou chave privada foi colocado no código.
-- A compilação não foi confirmada: esta máquina não tem Java/JDK, Gradle, Android SDK nem `adb` instalados. Uma tentativa de baixar o JDK 17 portátil foi interrompida pela cota de tamanho do workspace; os arquivos temporários foram removidos. Não houve teste em aparelho.
+- Os apps Android e Web estão registrados no Firebase. A configuração Web foi obtida e salva somente na cópia local. O workflow Android obtém a configuração oficial por meio do segredo protegido `FIREBASE_ANDROID_CONFIG` do GitHub Actions em tempo de build; `google-services.json` não é versionado nem incluído no repositório público. Nenhum segredo ou chave privada foi colocado no código.
+- Android `1.1.0` (versionCode 3) foi compilado no GitHub Actions, com `lintDebug` e `assembleDebug` concluídos com sucesso no run #7. O artefato `rastreador-veicular-debug-apk` está disponível até 1 de dezembro de 2026, às 19:56 (horário de Brasília). Não houve teste em aparelho, nem teste de posição real ou validação ponta a ponta com Firebase.
 
 ## Pausa automática no Wi-Fi da empresa (versão Android 1.1.0)
 
@@ -63,6 +63,6 @@ O projeto está no Spark, sem configurar faturamento. Firestore e Firebase Hosti
 - Inspeção do ZIP de origem e preservação dele na cópia: concluído.
 - Verificação manual dos arquivos de código/configuração: feita.
 - Regras restritivas do Firestore: publicadas no Console; sucesso confirmado nesta sessão.
-- `google-services.json` Android: não obtido; o endpoint oficial exigiu OAuth e o download pelo Console não disponibilizou o arquivo nesta cópia. Validação da integração Android pendente.
-- Validação estática deste checkout: XML do Manifest e integridade do ZIP original conferidos; compilação Android não realizada por ausência de JDK/Gradle/SDK e pelo JSON ausente.
-- Autorização Firebase ponta a ponta, queda/retorno de internet, localização real, tela apagada, movimento e teste no veículo: não realizados.
+- `google-services.json` não foi incluído no repositório público; o workflow recebeu a configuração do segredo protegido `FIREBASE_ANDROID_CONFIG`.
+- Run #7 no GitHub Actions: `lintDebug` e `assembleDebug` passaram; APK debug versionCode 3 foi publicado como artefato com retenção até 1 de dezembro de 2026, às 19:56 (horário de Brasília). Há avisos de depreciação nas actions Node.js/setup-java usadas, sem falha de build.
+- Revisão estática do fluxo de SSID, callbacks e cache; XML do Manifest validado pela compilação. Ainda faltam teste físico do Wi-Fi, transição para outras redes, localização real, tela apagada, movimento e teste ponta a ponta com Firebase.

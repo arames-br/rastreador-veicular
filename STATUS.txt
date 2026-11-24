@@ -1,17 +1,19 @@
-CÓPIA LOCAL DE TRABALHO — PAINEL NÃO IMPLANTADO
-Projeto Firebase dedicado: rastreador-arames-brasil
-Conta proprietária: aramesbrasil40@gmail.com
-Firestore: criado em southamerica-east1 / São Paulo (Spark)
-Regras restritivas: PUBLICADAS; Console confirmou sucesso nesta sessão. Leitura/gravação limitadas ao e-mail verificado aramesbrasil40@gmail.com e ao documento vehicles/vehicle-1; listagem e exclusão negadas.
-Authentication e-mail/senha: ativado; nenhuma conta criada.
-Apps Android e Web: registrados no Firebase
-Pacote Android: br.com.rastreadorveicular
-ID do app Android: 1:28890842793:android:09c8cbd2825b13b33c0bb8
-Configuração Web: obtida e salva somente na cópia local; ignorada pelo Git
-google-services.json Android: NÃO OBTIDO; arquivo oficial não foi disponibilizado pelo download do Console nesta cópia e a API oficial respondeu HTTP 401 por falta de OAuth. Nenhum JSON fabricado ou segredo adicionado.
-JDK 17 / Gradle / Android SDK 35 / adb: ausentes. Tentativa de download de JDK portátil interrompida pela cota do workspace; arquivos temporários removidos.
-Compilação APK: NÃO REALIZADA / NÃO CONFIRMADA
-Teste físico ou Firebase ponta a ponta: NÃO REALIZADOS
-Deploy do painel: NÃO REALIZADO; requer autorização expressa.
-ZIP fonte-original-rastreador.zip: preservado.
-GitHub público: README/STATUS locais atualizados nesta cópia, mas NÃO enviados ao repositório remoto; o git CLI não está instalado. O editor Web do GitHub abriu, mas a atualização não foi concluída/verificada com segurança; leitura direta confirmou que os arquivos remotos continuam desatualizados.
+STATUS — atualização Android 1.1.0
+
+Projeto Firebase dedicado: rastreador-arames-brasil; proprietário autorizado: aramesbrasil40@gmail.com.
+O app instalado mantém o mesmo package name, `br.com.rastreadorveicular`; versionCode 3, versionName 1.1.0.
+
+Android:
+- Ao identificar o SSID exato `ARAMES BRASIL` (com ou sem aspas retornadas pelo Android), remove as atualizações de localização e impede novas posições/cache e uploads enquanto conectado.
+- Notificação persistente informa a pausa; ao desconectar, o serviço ativo retoma GPS. Outras redes Wi-Fi e dados móveis mantêm rastreamento normal.
+- Se o Android não disponibilizar o SSID, rastreamento permanece ativo por segurança e a notificação informa que o SSID não pôde ser identificado.
+- Adicionada permissão normal ACCESS_WIFI_STATE; nenhuma permissão de runtime de localização foi ampliada.
+- Manifest, app version, implementação Kotlin, README e workflow atualizados no GitHub público.
+
+CI / APK:
+- GitHub Actions run #7: `lintDebug` e `assembleDebug` concluíram com sucesso.
+- Artefato `rastreador-veicular-debug-apk`: https://github.com/arames-br/rastreador-veicular/actions/runs/45505346237
+- Retenção até 2026-12-01 19:56 (America/Sao_Paulo); baixar o ZIP do artefato antes da expiração.
+- O workflow injeta a configuração Android do Firebase do segredo protegido `FIREBASE_ANDROID_CONFIG`; nenhum JSON secreto foi versionado.
+
+Limites: não houve teste em aparelho, teste de SSID real, teste de posição real, autenticação ponta a ponta, mudanças em regras Firebase nem deploy do painel web. A máquina local não dispõe do ambiente Android para compilar; o build confirmado foi no GitHub Actions.
