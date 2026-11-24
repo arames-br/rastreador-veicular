@@ -144,6 +144,19 @@ class LocationService : Service() {
             }
     }
 
+    // Keep only the newest fix on-device while the network is unavailable; do not queue an unbounded backlog.
+    private fun persistLatestLocally(location: Location) {
+        // Do not write a fresh position/cache entry on the company's Wi-Fi.
+        if (isConnectedToCompanyWifi()) return
+        prefs.edit()
+            .putLong("pending_time_ms", location.time)
+            .putString("pending_lat", location.latitude.toString())
+            .putString("pending_lng", location.longitude.toString())
+            .putString("pending_accuracy", location.accuracy.toString())
+            .putString("pending_speed", location.speed.toString())
+            .apply()
+    }
+
     /**
      * Android may hide the SSID when location permission/services are unavailable. In that case
      * return null and keep normal tracking active (the safe fallback); never log the SSID.
