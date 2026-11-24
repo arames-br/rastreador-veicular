@@ -44,7 +44,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
         val intro = TextView(this).apply {
-            text = "Entre com a conta autorizada para usar o rastreador. As coordenadas só são visíveis para ${ownerEmail}."
+            text = "Entre com a conta autorizada. Para receber comandos do painel, inicie o monitoramento neste celular e mantenha a notificação persistente ativa. As coordenadas só são visíveis para ${ownerEmail}."
             textSize = 15f
             setPadding(0, 16, 0, 10)
         }
@@ -75,7 +75,7 @@ class MainActivity : Activity() {
             setOnClickListener { refreshVerification() }
         }
         val start = Button(this).apply {
-            text = "INICIAR RASTREAMENTO"
+            text = "ATIVAR MONITORAMENTO REMOTO"
             setOnClickListener { checkPermissionsAndStart() }
         }
         val stop = Button(this).apply {
@@ -175,13 +175,14 @@ class MainActivity : Activity() {
     private fun startTracker() {
         val intent = Intent(this, LocationService::class.java).setAction(LocationService.ACTION_START)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-        status.text = "Rastreamento iniciado. Deixe a notificação ativa. Se a internet cair, a posição mais recente fica guardada no celular e será enviada quando houver conexão."
-        Toast.makeText(this, "Rastreamento iniciado", Toast.LENGTH_LONG).show()
+        status.text = "Serviço habilitado neste celular para ouvir os comandos do painel. Mantenha a notificação persistente e não force o encerramento do app. O GPS segue a última solicitação remota; se o serviço não estiver ativo, o painel não consegue iniciá-lo à distância. No Wi-Fi ARAMES BRASIL, o GPS permanece pausado automaticamente e só retoma ao sair da rede."
+        Toast.makeText(this, "Monitoramento ativado neste celular", Toast.LENGTH_LONG).show()
     }
 
     private fun stopTracker() {
-        stopService(Intent(this, LocationService::class.java).setAction(LocationService.ACTION_STOP))
-        status.text = "Rastreamento parado pelo usuário."
+        val intent = Intent(this, LocationService::class.java).setAction(LocationService.ACTION_STOP)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+        status.text = "Serviço encerrado neste celular. Enquanto estiver encerrado, comandos do painel ficam pendentes e não podem iniciar o GPS; abra o app e toque em ATIVAR MONITORAMENTO REMOTO."
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

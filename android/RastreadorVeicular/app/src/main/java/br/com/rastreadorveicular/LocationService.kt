@@ -30,6 +30,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.ListenerRegistration
 import java.util.concurrent.atomic.AtomicBoolean
 
 class LocationService : Service() {
@@ -39,6 +40,8 @@ class LocationService : Service() {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val uploading = AtomicBoolean(false)
     private var callback: LocationCallback? = null
+    private var controlListener: ListenerRegistration? = null
+    private var remoteDesiredTracking = true
     private val networkCallbacks = mutableListOf<ConnectivityManager.NetworkCallback>()
     private var locationUpdatesRunning = false
     private var locationRemovalInProgress = false
@@ -52,8 +55,10 @@ class LocationService : Service() {
         startForegroundCompat(buildNotification("Aguardando posição GPS e conexão"))
         if (!authorized()) { stopSelf(); return }
         prefs.edit().putBoolean("active", true).apply()
+        remoteDesiredTracking = prefs.getBoolean("remote_desired_tracking", true)
         lastUploadedAtMs = prefs.getLong("last_uploaded_at_ms", 0)
         createLocationCallback()
+        listenForRemoteControl()
         registerNetworkListener()
         // Inspect current Wi-Fi immediately; do not wait for the first network callback.
         refreshTrackingState()
@@ -94,12 +99,14 @@ class LocationService : Service() {
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 // Check again at delivery time to close the gap before connectivity callbacks run.
+                if (!remoteDesiredTracking) return
                 if (isConnectedToCompanyWifi()) {
                     pauseForCompanyWifi()
                     return
                 }
                 result.locations.forEach { location ->
                     // A Wi-Fi transition could happen between two fixes in the same batch.
+                    if (!remoteDesiredTracking) return
                     if (isConnectedToCompanyWifi()) {
                         pauseForCompanyWifi()
                         return
@@ -113,7 +120,7 @@ class LocationService : Service() {
     }
 
     private fun startLocationUpdates() {
-        if (locationUpdatesRunning || locationRemovalInProgress || callback == null || !prefs.getBoolean("active", false) || pausedForCompanyWifi) return
+        if (locationUpdatesRunning || locationRemovalInProgress || callback == null || !prefs.getBoolean("active", false) || !remoteDesiredTracking || pausedForCompanyWifi) return
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15_000L)
             .setMinUpdateIntervalMillis(10_000L)
             .setMinUpdateDistanceMeters(10f)
@@ -138,7 +145,7 @@ class LocationService : Service() {
             .addOnCompleteListener {
                 locationRemovalInProgress = false
                 // Serialize a rapid leave/rejoin transition after the pending removal is complete.
-                if (prefs.getBoolean("active", false) && !pausedForCompanyWifi && authorized()) {
+                if (prefs.getBoolean("active", false) && remoteDesiredTracking && !pausedForCompanyWifi && authorized()) {
                     startLocationUpdates()
                 }
             }
@@ -217,9 +224,48 @@ class LocationService : Service() {
         }
     }
 
-    /** Runs on the main thread, serializing network transitions and keeping one location callback. */
+    /** Receives only the owner's single desired-state document while the user-enabled service is alive. */
+    private fun listenForRemoteControl() {
+        controlListener?.remove()
+        controlListener = firestore.collection(CONTROL_COLLECTION).document(VEHICLE_ID)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "Comando remoto ainda não sincronizado; mantendo o último estado conhecido", error)
+                    refreshNotification()
+                    return@addSnapshotListener
+                }
+                val desired = if (snapshot != null && snapshot.exists()) {
+                    snapshot.getBoolean("desiredTracking")
+                } else {
+                    // No command has been saved yet: a foreground activation initiated on-device
+                    // keeps the pre-existing manual-start behavior.
+                    true
+                }
+                if (desired == null) {
+                    Log.e(TAG, "Documento de controle inválido; pausando até receber um comando válido")
+                    remoteDesiredTracking = false
+                } else {
+                    remoteDesiredTracking = desired
+                }
+                prefs.edit().putBoolean("remote_desired_tracking", remoteDesiredTracking).apply()
+                if (!remoteDesiredTracking) {
+                    // Do not replay a pre-stop cached fix if tracking is enabled again later.
+                    prefs.edit().remove("pending_time_ms").remove("pending_lat").remove("pending_lng")
+                        .remove("pending_accuracy").remove("pending_speed").apply()
+                }
+                refreshTrackingState()
+            }
+    }
+
+    /** Runs on the main thread, serializing network and remote-command transitions. */
     private fun refreshTrackingState() {
         if (!prefs.getBoolean("active", false) || !authorized()) return
+        if (!remoteDesiredTracking) {
+            pausedForCompanyWifi = false
+            stopLocationUpdates()
+            refreshNotification()
+            return
+        }
         if (isConnectedToCompanyWifi()) {
             pauseForCompanyWifi()
             return
@@ -252,6 +298,7 @@ class LocationService : Service() {
     }
 
     private fun maybeUpload(location: Location, reconnect: Boolean) {
+        if (!remoteDesiredTracking) return
         if (isConnectedToCompanyWifi()) {
             pauseForCompanyWifi()
             return
@@ -268,6 +315,7 @@ class LocationService : Service() {
     }
 
     private fun flushPending() {
+        if (!remoteDesiredTracking) return
         if (isConnectedToCompanyWifi()) {
             pauseForCompanyWifi()
             return
@@ -287,6 +335,7 @@ class LocationService : Service() {
     }
 
     private fun upload(location: Location) {
+        if (!remoteDesiredTracking) return
         // Last-moment guard: queued/cache data is never sent on the company's exact SSID.
         if (isConnectedToCompanyWifi()) {
             pauseForCompanyWifi()
@@ -328,6 +377,8 @@ class LocationService : Service() {
 
     private fun refreshNotification() {
         val message = when {
+            !prefs.getBoolean("active", false) -> "Serviço aguardando ativação no celular"
+            !remoteDesiredTracking -> "Pausado por comando remoto — serviço aguardando novos comandos"
             pausedForCompanyWifi -> "Pausa automática — conectado ao Wi-Fi da empresa"
             !wifiSsidAvailable -> "SSID não identificado — rastreamento mantido por segurança"
             !hasValidatedInternet() -> "Sem internet — guardando a posição mais recente neste celular"
@@ -346,7 +397,7 @@ class LocationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             Notification.Builder(this, CHANNEL_ID) else Notification.Builder(this)
-        return builder.setContentTitle("Rastreador veicular ativo")
+        return builder.setContentTitle("Rastreador — serviço de monitoramento")
             .setContentText(message)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
@@ -375,6 +426,8 @@ class LocationService : Service() {
             catch (_: Exception) { }
         }
         networkCallbacks.clear()
+        controlListener?.remove()
+        controlListener = null
         if (!prefs.getBoolean("active", false)) {
             prefs.edit().putString("last_state", "stopped").apply()
         }
@@ -387,6 +440,7 @@ class LocationService : Service() {
         const val ACTION_START = "br.com.rastreadorveicular.START"
         const val ACTION_STOP = "br.com.rastreadorveicular.STOP"
         const val VEHICLE_ID = "vehicle-1"
+        private const val CONTROL_COLLECTION = "trackerControl"
         private const val OWNER_EMAIL = "aramesbrasil40@gmail.com"
         private const val COMPANY_WIFI_SSID = "ARAMES BRASIL"
         private const val TAG = "GPS_VEICULAR"
