@@ -19,6 +19,9 @@
     .dot { width:10px;height:10px;border-radius:50%;background:#777 } .online .dot { background:#188038 } .stale .dot { background:#e37400 } .error .dot { background:#c5221f }
     .facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:12px 0 }
     .fact { background:#f7f8fa; padding:10px; border-radius:7px; overflow-wrap:anywhere } .fact small { display:block;color:#5f6368;margin-bottom:4px }
+    .control { background:#fff8f0; border:1px solid #f1d7bb; border-radius:9px; padding:14px; margin:12px 0; line-height:1.5 }
+    .control strong { display:block; margin-bottom:5px } #controlState { margin:6px 0; font-weight:650 }
+    #controlHelp { color:#5f6368; font-size:.93rem; margin:8px 0 0 }
     #app { display:none } #notice { color:#5f6368; line-height:1.5 } a { color:#8c1717 } footer { color:#60656b; font-size:.85rem; margin:14px 2px }
     @media(max-width:600px){ .wrap{margin:15px auto} header{align-items:flex-start;flex-direction:column} #map{height:52vh} }
   </style>
@@ -40,6 +43,15 @@
       <header><h1>Rastreador Arames Brasil</h1><div class="row"><span id="signedIn"></span><button id="logout" class="secondary">Sair</button></div></header>
       <div class="card">
         <div id="status"><i class="dot"></i><span id="statusText">Conectando ao rastreador…</span></div>
+        <section class="control" aria-labelledby="controlTitle">
+          <strong id="controlTitle">Controle remoto do rastreamento</strong>
+          <div id="controlState" role="status" aria-live="polite">Carregando estado do comando…</div>
+          <div class="row">
+            <button id="startTracking">Solicitar início</button>
+            <button id="stopTracking" class="secondary">Solicitar parada</button>
+          </div>
+          <p id="controlHelp">Os botões salvam apenas o estado desejado no servidor. O celular só recebe a solicitação se o app já tiver sido aberto e o monitoramento ativado nele, com o serviço/notificação ativos e internet. Se não estiver ouvindo, a solicitação fica pendente; o site não consegue iniciar remotamente um serviço Android encerrado.</p>
+        </section>
         <div class="facts">
           <div class="fact"><small>Horário da captura GPS</small><strong id="captured">—</strong></div>
           <div class="fact"><small>Última atualização recebida</small><strong id="received">—</strong></div>
@@ -49,7 +61,7 @@
         </div>
         <div id="map" aria-label="Mapa da última localização do veículo"></div>
         <p><a id="mapsLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir localização no Google Maps</a></p>
-        <p id="notice">O painel mostra apenas a última posição recebida. O rastreador Android guarda somente a posição mais recente enquanto não há internet; quando a conexão voltar, ele tenta sincronizar. Atraso no horário indica que não chegou uma posição nova recentemente.</p>
+        <p id="notice">O painel mostra apenas a última posição recebida. O rastreador Android guarda somente a posição mais recente enquanto não há internet; quando a conexão voltar, ele tenta sincronizar. Atraso no horário indica que não chegou uma posição nova recentemente. Na rede Wi-Fi da empresa, o GPS fica pausado automaticamente: um pedido de início feito aqui permanece como estado desejado e só volta a rastrear quando o celular sair dessa rede.</p>
       </div>
       <footer>Área privada. Não compartilhe o link do painel; o acesso continua protegido pelo login e pelas regras do Firebase.</footer>
     </section>
