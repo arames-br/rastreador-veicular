@@ -11,6 +11,13 @@ Esta cópia preserva o ZIP recebido em `fonte-original-rastreador.zip` e acresce
 - Os apps Android e Web estão registrados no Firebase. A configuração Web foi obtida e salva somente na cópia local. O `google-services.json` do Android ainda não foi instalado: o botão de download do Console foi acionado, mas o arquivo não ficou disponível para esta cópia; a API oficial `projects.androidApps.getConfig` respondeu HTTP 401 por falta de credencial OAuth nessa ferramenta. Não foi fabricado nem adicionado um JSON substituto. Nenhum segredo ou chave privada foi colocado no código.
 - A compilação não foi confirmada: esta máquina não tem Java/JDK, Gradle, Android SDK nem `adb` instalados. Uma tentativa de baixar o JDK 17 portátil foi interrompida pela cota de tamanho do workspace; os arquivos temporários foram removidos. Não houve teste em aparelho.
 
+## Pausa automática no Wi-Fi da empresa (versão Android 1.1.0)
+
+- Quando o Android consegue identificar a rede conectada como o SSID exato `ARAMES BRASIL` (SSID diferencia maiúsculas/minúsculas), o app remove as atualizações de localização, não grava novas posições no cache local e não envia nem descarrega posições pendentes. A notificação persistente informa que o rastreamento está pausado automaticamente.
+- Ao sair dessa rede, se o serviço continuar ativo, o app retoma as atualizações de localização. A sincronização pendente só ocorre com internet validada. Em outras redes Wi-Fi e em dados móveis, o rastreamento continua normalmente.
+- O SSID é verificado sem registrá-lo em logs. Android pode ocultá-lo se o acesso à localização estiver negado/desativado ou se o sistema não o disponibilizar; nesse caso o comportamento deliberadamente seguro é manter o rastreamento ativo, e a notificação indica que o SSID não pôde ser identificado.
+- Para instalar a versão nova, baixe e instale o APK atualizado. Confirme que localização precisa e notificações estão permitidas e que os Serviços de localização do aparelho estão ligados. Não é necessário conceder uma nova permissão de localização em segundo plano. A pausa depende do Android disponibilizar o SSID à API; o app não consegue garantir a detecção se o sistema o ocultar.
+
 ## Fluxo de dados / segurança
 
 - Só uma localização atual é mantida na nuvem: `vehicles/vehicle-1`; não há trilha histórica nem envio de rotas passadas.
