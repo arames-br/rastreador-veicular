@@ -39,7 +39,7 @@ class LocationService : Service() {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val uploading = AtomicBoolean(false)
     private var callback: LocationCallback? = null
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private val networkCallbacks = mutableListOf<ConnectivityManager.NetworkCallback>()
     private var locationUpdatesRunning = false
     private var locationRemovalInProgress = false
     private var pausedForCompanyWifi = false
@@ -185,21 +185,35 @@ class LocationService : Service() {
 
     private fun registerNetworkListener() {
         val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val listener = object : ConnectivityManager.NetworkCallback() {
+        fun createListener() = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) { handler.post { refreshTrackingState() } }
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
                 handler.post { refreshTrackingState() }
             }
             override fun onLost(network: Network) { handler.post { refreshTrackingState() } }
         }
-        networkCallback = listener
+
+        // The Internet callback handles cellular/validated-network transitions; Wi-Fi is also
+        // observed separately so a connected company AP without Internet is still detected.
         try {
+            val internetListener = createListener()
             manager.registerNetworkCallback(
                 NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
-                listener
+                internetListener
             )
+            networkCallbacks.add(internetListener)
         } catch (e: Exception) {
-            Log.w(TAG, "Não foi possível acompanhar a conectividade", e)
+            Log.w(TAG, "Não foi possível acompanhar as redes com internet", e)
+        }
+        try {
+            val wifiListener = createListener()
+            manager.registerNetworkCallback(
+                NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),
+                wifiListener
+            )
+            networkCallbacks.add(wifiListener)
+        } catch (e: Exception) {
+            Log.w(TAG, "Não foi possível acompanhar redes Wi-Fi", e)
         }
     }
 
@@ -355,10 +369,12 @@ class LocationService : Service() {
 
     override fun onDestroy() {
         stopLocationUpdates()
-        networkCallback?.let {
-            try { (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(it) }
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        networkCallbacks.forEach {
+            try { manager.unregisterNetworkCallback(it) }
             catch (_: Exception) { }
         }
+        networkCallbacks.clear()
         if (!prefs.getBoolean("active", false)) {
             prefs.edit().putString("last_state", "stopped").apply()
         }
