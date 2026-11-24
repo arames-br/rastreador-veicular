@@ -33,7 +33,7 @@ jobs:
           printf '%s' "$FIREBASE_ANDROID_CONFIG" > android/RastreadorVeicular/app/google-services.json
       - name: Build debug APK
         working-directory: android/RastreadorVeicular
-        run: gradle assembleDebug --no-daemon
+        run: gradle lintDebug assembleDebug --no-daemon
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
