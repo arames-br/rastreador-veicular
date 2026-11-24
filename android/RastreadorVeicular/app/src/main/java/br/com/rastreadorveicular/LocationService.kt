@@ -7,15 +7,18 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.SupplicantState
+import android.net.wifi.WifiManager
 import android.os.Build
-import android.os.IBinder
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import com.google.android.gms.location.LocationCallback
@@ -37,6 +40,10 @@ class LocationService : Service() {
     private val uploading = AtomicBoolean(false)
     private var callback: LocationCallback? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var locationUpdatesRunning = false
+    private var locationRemovalInProgress = false
+    private var pausedForCompanyWifi = false
+    private var wifiSsidAvailable = false
     private var lastUploadedAtMs: Long = 0
 
     override fun onCreate() {
@@ -46,21 +53,29 @@ class LocationService : Service() {
         if (!authorized()) { stopSelf(); return }
         prefs.edit().putBoolean("active", true).apply()
         lastUploadedAtMs = prefs.getLong("last_uploaded_at_ms", 0)
+        createLocationCallback()
         registerNetworkListener()
-        beginLocationUpdates()
+        // Inspect current Wi-Fi immediately; do not wait for the first network callback.
+        refreshTrackingState()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             prefs.edit().putBoolean("active", false).apply()
+            pausedForCompanyWifi = false
+            stopLocationUpdates()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == ACTION_START && !authorized()) {
-            prefs.edit().putBoolean("active", false).apply()
-            stopSelf()
-            return START_NOT_STICKY
+        if (intent?.action == ACTION_START) {
+            if (!authorized()) {
+                prefs.edit().putBoolean("active", false).apply()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            prefs.edit().putBoolean("active", true).apply()
+            refreshTrackingState()
         }
         return START_STICKY
     }
@@ -74,23 +89,39 @@ class LocationService : Service() {
         return true
     }
 
-    private fun beginLocationUpdates() {
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15_000L)
-            .setMinUpdateIntervalMillis(10_000L)
-            .setMinUpdateDistanceMeters(10f)
-            .build()
+    private fun createLocationCallback() {
+        if (callback != null) return
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
+                // Check again at delivery time to close the gap before connectivity callbacks run.
+                if (isConnectedToCompanyWifi()) {
+                    pauseForCompanyWifi()
+                    return
+                }
                 result.locations.forEach { location ->
+                    // A Wi-Fi transition could happen between two fixes in the same batch.
+                    if (isConnectedToCompanyWifi()) {
+                        pauseForCompanyWifi()
+                        return
+                    }
                     persistLatestLocally(location)
                     refreshNotification()
                     maybeUpload(location, false)
                 }
             }
         }
+    }
+
+    private fun startLocationUpdates() {
+        if (locationUpdatesRunning || locationRemovalInProgress || callback == null || !prefs.getBoolean("active", false) || pausedForCompanyWifi) return
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15_000L)
+            .setMinUpdateIntervalMillis(10_000L)
+            .setMinUpdateDistanceMeters(10f)
+            .build()
         try {
             LocationServices.getFusedLocationProviderClient(this)
                 .requestLocationUpdates(request, callback!!, mainLooper)
+            locationUpdatesRunning = true
         } catch (e: SecurityException) {
             Log.e(TAG, "Permissão de localização ausente", e)
             prefs.edit().putBoolean("active", false).apply()
@@ -98,28 +129,91 @@ class LocationService : Service() {
         }
     }
 
-    // Keep only the newest fix on-device while the network is unavailable; do not queue an unbounded backlog.
-    private fun persistLatestLocally(location: Location) {
-        prefs.edit()
-            .putLong("pending_time_ms", location.time)
-            .putString("pending_lat", location.latitude.toString())
-            .putString("pending_lng", location.longitude.toString())
-            .putString("pending_accuracy", location.accuracy.toString())
-            .putString("pending_speed", location.speed.toString())
-            .apply()
+    private fun stopLocationUpdates() {
+        if (!locationUpdatesRunning || locationRemovalInProgress) return
+        val activeCallback = callback ?: return
+        locationRemovalInProgress = true
+        locationUpdatesRunning = false
+        LocationServices.getFusedLocationProviderClient(this).removeLocationUpdates(activeCallback)
+            .addOnCompleteListener {
+                locationRemovalInProgress = false
+                // Serialize a rapid leave/rejoin transition after the pending removal is complete.
+                if (prefs.getBoolean("active", false) && !pausedForCompanyWifi && authorized()) {
+                    startLocationUpdates()
+                }
+            }
+    }
+
+    /**
+     * Android may hide the SSID when location permission/services are unavailable. In that case
+     * return null and keep normal tracking active (the safe fallback); never log the SSID.
+     */
+    @Suppress("DEPRECATION")
+    private fun connectedWifiSsid(): String? {
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return null
+        return try {
+            val info = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
+                ?: return null
+            if (info.supplicantState != SupplicantState.COMPLETED) return null
+            val ssid = info.ssid?.trim()?.removeSurrounding("\"")?.trim() ?: return null
+            if (ssid.isEmpty() || ssid.equals("<unknown ssid>", true) || ssid == "0x") null else ssid
+        } catch (e: Exception) {
+            Log.w(TAG, "Não foi possível identificar o Wi-Fi conectado; mantendo rastreamento ativo")
+            null
+        }
+    }
+
+    private fun isConnectedToCompanyWifi(): Boolean {
+        val ssid = connectedWifiSsid()
+        wifiSsidAvailable = ssid != null
+        // SSIDs are case-sensitive. Only the exact configured network pauses tracking.
+        return ssid == COMPANY_WIFI_SSID
     }
 
     private fun registerNetworkListener() {
         val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val listener = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { handler.post { flushPending() } }
+            override fun onAvailable(network: Network) { handler.post { refreshTrackingState() } }
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) handler.post { flushPending() }
+                handler.post { refreshTrackingState() }
             }
+            override fun onLost(network: Network) { handler.post { refreshTrackingState() } }
         }
         networkCallback = listener
-        try { manager.registerNetworkCallback(NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), listener) }
-        catch (e: Exception) { Log.w(TAG, "Não foi possível acompanhar a conectividade", e) }
+        try {
+            manager.registerNetworkCallback(
+                NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
+                listener
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Não foi possível acompanhar a conectividade", e)
+        }
+    }
+
+    /** Runs on the main thread, serializing network transitions and keeping one location callback. */
+    private fun refreshTrackingState() {
+        if (!prefs.getBoolean("active", false) || !authorized()) return
+        if (isConnectedToCompanyWifi()) {
+            pauseForCompanyWifi()
+            return
+        }
+        if (pausedForCompanyWifi) {
+            pausedForCompanyWifi = false
+            startLocationUpdates()
+        } else {
+            startLocationUpdates()
+        }
+        if (hasValidatedInternet() && !isConnectedToCompanyWifi()) flushPending()
+        refreshNotification()
+    }
+
+    private fun pauseForCompanyWifi() {
+        wifiSsidAvailable = true
+        if (!pausedForCompanyWifi) {
+            pausedForCompanyWifi = true
+            stopLocationUpdates()
+        }
+        refreshNotification()
     }
 
     private fun hasValidatedInternet(): Boolean {
@@ -131,6 +225,10 @@ class LocationService : Service() {
     }
 
     private fun maybeUpload(location: Location, reconnect: Boolean) {
+        if (isConnectedToCompanyWifi()) {
+            pauseForCompanyWifi()
+            return
+        }
         if (!hasValidatedInternet()) return
         val previousLat = prefs.getString("uploaded_lat", null)?.toDoubleOrNull()
         val previousLng = prefs.getString("uploaded_lng", null)?.toDoubleOrNull()
@@ -143,10 +241,14 @@ class LocationService : Service() {
     }
 
     private fun flushPending() {
+        if (isConnectedToCompanyWifi()) {
+            pauseForCompanyWifi()
+            return
+        }
         val time = prefs.getLong("pending_time_ms", 0)
         val lat = prefs.getString("pending_lat", null)?.toDoubleOrNull()
         val lng = prefs.getString("pending_lng", null)?.toDoubleOrNull()
-        if (time > 0 && lat != null && lng != null && hasValidatedInternet()) {
+        if (time > 0 && lat != null && lng != null && hasValidatedInternet() && !isConnectedToCompanyWifi()) {
             val location = Location("cached").apply {
                 latitude = lat; longitude = lng
                 accuracy = prefs.getString("pending_accuracy", "0")?.toFloatOrNull() ?: 0f
@@ -158,7 +260,12 @@ class LocationService : Service() {
     }
 
     private fun upload(location: Location) {
-        if (!authorized() || !uploading.compareAndSet(false, true)) return
+        // Last-moment guard: queued/cache data is never sent on the company's exact SSID.
+        if (isConnectedToCompanyWifi()) {
+            pauseForCompanyWifi()
+            return
+        }
+        if (!authorized() || !hasValidatedInternet() || !uploading.compareAndSet(false, true)) return
         val timeMs = location.time
         val data = hashMapOf<String, Any>(
             "latitude" to location.latitude,
@@ -194,6 +301,8 @@ class LocationService : Service() {
 
     private fun refreshNotification() {
         val message = when {
+            pausedForCompanyWifi -> "Pausa automática — conectado ao Wi-Fi da empresa"
+            !wifiSsidAvailable -> "SSID não identificado — rastreamento mantido por segurança"
             !hasValidatedInternet() -> "Sem internet — guardando a posição mais recente neste celular"
             prefs.getLong("pending_time_ms", 0) > 0 -> "Conectado — sincronizando a posição mais recente"
             else -> "Rastreamento ativo — localização sincronizada quando há conexão"
@@ -232,7 +341,7 @@ class LocationService : Service() {
     }
 
     override fun onDestroy() {
-        callback?.let { LocationServices.getFusedLocationProviderClient(this).removeLocationUpdates(it) }
+        stopLocationUpdates()
         networkCallback?.let {
             try { (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(it) }
             catch (_: Exception) { }
@@ -250,6 +359,7 @@ class LocationService : Service() {
         const val ACTION_STOP = "br.com.rastreadorveicular.STOP"
         const val VEHICLE_ID = "vehicle-1"
         private const val OWNER_EMAIL = "aramesbrasil40@gmail.com"
+        private const val COMPANY_WIFI_SSID = "ARAMES BRASIL"
         private const val TAG = "GPS_VEICULAR"
         private const val CHANNEL_ID = "vehicle_tracking"
         private const val NOTIFICATION_ID = 7
