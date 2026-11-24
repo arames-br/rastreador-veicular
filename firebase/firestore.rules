@@ -6,19 +6,45 @@ service cloud.firestore {
         && request.auth.token.email == 'aramesbrasil40@gmail.com'
         && request.auth.token.email_verified == true;
     }
+
     match /vehicles/{vehicleId} {
       allow get: if owner() && vehicleId == 'vehicle-1';
       allow list: if false;
-      allow create, update: if owner() && vehicleId == 'vehicle-1'
-        && request.resource.data.keys().hasAll(['latitude','longitude','accuracyMeters','speedMetersPerSecond','capturedAtClientMs','updatedAt','deviceStatus'])
-        && request.resource.data.keys().hasOnly(['latitude','longitude','accuracyMeters','speedMetersPerSecond','capturedAtClientMs','updatedAt','deviceStatus'])
-        && request.resource.data.latitude is number && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
-        && request.resource.data.longitude is number && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180
+      allow create, update: if owner()
+        && vehicleId == 'vehicle-1'
+        && request.resource.data.keys().hasAll([
+          'latitude', 'longitude', 'accuracyMeters', 'speedMetersPerSecond',
+          'capturedAtClientMs', 'updatedAt', 'deviceStatus'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'latitude', 'longitude', 'accuracyMeters', 'speedMetersPerSecond',
+          'capturedAtClientMs', 'updatedAt', 'deviceStatus'
+        ])
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -90
+        && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
         && request.resource.data.accuracyMeters is number
         && request.resource.data.speedMetersPerSecond is number
         && request.resource.data.capturedAtClientMs is int
         && request.resource.data.updatedAt == request.time
         && request.resource.data.deviceStatus == 'tracking';
+      allow delete: if false;
+    }
+
+    match /trackerControl/{controlId} {
+      // The owner can read only the one command document; collection queries are never allowed.
+      allow get: if owner() && controlId == 'vehicle-1';
+      allow list: if false;
+      // Only the desired state and a Firestore server timestamp may be created or changed.
+      allow create, update: if owner()
+        && controlId == 'vehicle-1'
+        && request.resource.data.keys().hasAll(['desiredTracking', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['desiredTracking', 'updatedAt'])
+        && request.resource.data.desiredTracking is bool
+        && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
   }
