@@ -7,6 +7,10 @@ plugins {
 android {
     namespace = "br.com.rastreadorveicular"
     compileSdk = 35
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     defaultConfig {
         applicationId = "br.com.rastreadorveicular"
         minSdk = 26
