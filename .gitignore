@@ -1,0 +1,7 @@
+# Firebase client configuration (public but project-specific)
+web/firebase-config.js
+android/RastreadorVeicular/app/google-services.json
+# Local Android outputs
+**/build/
+.gradle/
+local.properties
